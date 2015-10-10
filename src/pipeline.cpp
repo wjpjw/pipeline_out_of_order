@@ -269,44 +269,81 @@ void pipe_cycle_exe(Pipeline *p){
 /**********************************************************************
  * -----------  DO NOT MODIFY THE CODE ABOVE THIS LINE ----------------
  **********************************************************************/
-
+void rename(RAT*rat, Inst_Info*inst){
+  RAT_set_remap(rat, inst->dest_reg, inst->dr_tag);
+  inst->src1_tag=RAT_get_remap(rat, inst->src1_reg);
+  inst->src2_tag=RAT_get_remap(rat, inst->src2_reg);
+  if(inst->src1_tag==-1){
+    inst->src1_tag=inst->src1_reg;
+    inst->src1_ready=true;
+  }
+  if(inst->src2_tag==-1){
+    inst->src2_tag=inst->src2_reg;
+    inst->src2_ready=true;
+  }  
+}  
 void pipe_cycle_issue(Pipeline *p) {
-
-  // insert new instruction(s) into ROB (rename)
-  // every cycle up to PIPEWIDTH instructions issued
-
-  // TODO: Find space in ROB and transfer instruction (valid = 1, exec = 0, ready = 0)
-  // TODO: If src1/src2 is not remapped, set src1ready/src2ready
-  // TODO: If src1/src is remapped, set src1tag/src2tag from RAT. Set src1ready/src2ready based on ready bit from ROB entries.
-  // TODO: Set dr_tag
-
+  int jj = 0;
+  static uint64_t start_inst_id = 1;
+  // Loop Over ID Latch
+  for(jj = 0; jj < PIPE_WIDTH; jj++) {
+    if(!ROB_check_space(p->pipe_ROB)){
+      //rob has no space!
+      return;
+    }
+    if(p->ID_latch[jj].valid) {
+      if(p->ID_latch[jj].inst.inst_num == start_inst_id) { // In Order Inst Found
+	ROB_insert(p->pipe_ROB,  p->ID_latch[jj].inst);    // insert inst into rob (valid = 1, exec = 0, ready = 0)
+	rename(p->pipe_RAT, &p->ID_latch[jj].inst);        // rename inst's src tags and write inst's dr_tag into rat!  
+	p->ID_latch[jj].valid  = false;                    // false means empty!
+	start_inst_id++;
+      }
+    }
+  }
 }
 
 //--------------------------------------------------------------------//
-
+bool inst_ready(Inst_Info inst){
+  return inst.src1_ready&&inst.src2_ready;
+}
+ROB_Entry* oldest_entry(ROB*rob){
+  return &rob->ROB_Entries[rob->head_ptr];
+}
+ROB_Entry* ooo_oldest_entry(ROB*rob){
+  for(int i=rob->head_ptr;i!=rob->tail_ptr;i=ptr_next(i)){
+    if(inst_ready(rob->ROB_Entries[i].inst) && !rob->ROB_Entries[i].exec){
+      rob->ROB_Entries[i].exec=true;
+      return &rob->ROB_Entries[i];
+    }  
+  }  
+  return 0;
+}  
 void pipe_cycle_schedule(Pipeline *p) {
-
-  // select instruction(s) to Execute
-  // every cycle up to PIPEWIDTH instructions scheduled
-
-  // TODO: Implement two scheduling policies (SCHED_POLICY: 0 and 1)
-
   if(SCHED_POLICY==0){
-    // inorder scheduling
-    // Find all valid entries, if oldest is stalled then stop
-    // Else mark it as ready to execute and send to SC_latch
-
-
+    int jj = 0;
+    for(jj = 0; jj < PIPE_WIDTH; jj++) {
+      if(p->SC_latch[jj].valid || p->SC_latch[jj].stall) {
+	continue;
+      }
+      ROB_Entry* e=oldest_entry(p->pipe_ROB);
+      if(inst_ready(e->inst) && !e->exec){
+	e->exec=true;
+	p->SC_latch[jj]={true,false,e->inst};
+      }
+    }
   }
-
   if(SCHED_POLICY==1){
-    // out of order scheduling
-    // Find valid + src1ready + src2ready + !exec entries in ROB
-    // Mark ROB entry as ready to execute  and transfer instruction to SC_latch
-
-
+    int jj = 0;
+    for(jj = 0; jj < PIPE_WIDTH; jj++) {
+      if(p->SC_latch[jj].valid || p->SC_latch[jj].stall){
+	continue;
+      }
+      ROB_Entry* e=ooo_oldest_entry(p->pipe_ROB);
+      if(e!=0){
+	p->SC_latch[jj]={true,false,e->inst};
+      }
+    }
   }
-
 }
 
 
