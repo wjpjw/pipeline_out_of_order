@@ -92,6 +92,8 @@ void ROB_mark_ready(ROB *t, Inst_Info inst){
   for(int i=0;i<t->tail_ptr;i++){
     if(t->ROB_Entries[i].inst.inst_num==inst.inst_num){
       t->ROB_Entries[i].ready=true;
+      t->ROB_Entries[i].inst=inst;  //update the inst!
+      break;
     }  
   }    
 }

@@ -350,11 +350,16 @@ void pipe_cycle_schedule(Pipeline *p) {
 //--------------------------------------------------------------------//
 
 void pipe_cycle_writeback(Pipeline *p){
-
   // TODO: Go through all instructions out of EXE latch
   // TODO: Writeback to ROB (using wakeup function)
   // TODO: Update the ROB, mark ready, and update Inst Info in ROB
-
+  int jj = 0;
+  for(jj = 0; jj < MAX_WRITEBACKS; jj++) {      
+    if(p->EX_latch[jj].valid){
+      ROB_wakeup(p->pipe_ROB, p->EX_latch[jj].inst.dr_tag);
+      ROB_mark_ready(p->pipe_ROB, p->EX_latch[jj].inst);  
+    }
+  }
 }
 
 
@@ -363,16 +368,13 @@ void pipe_cycle_writeback(Pipeline *p){
 
 void pipe_cycle_commit(Pipeline *p) {
   int ii = 0;
-
+  
   // TODO: check the head of the ROB. If ready commit (update stats)
   // TODO: Deallocate entry from ROB
   // TODO: Update RAT after checking if the mapping is still relevant
-
-
-
-
-
-
+  if(!ROB_check_head(p->pipe_ROB)) return;
+  Inst_Info committed=ROB_remove_head(p->pipe_ROB);
+  RAT_reset_entry(p->pipe_RAT, committed.dest_reg);
   // DUMMY CODE (for compiling, and ensuring simulation terminates!)
   for(ii=0; ii<PIPE_WIDTH; ii++){
     if(p->FE_latch[ii].valid){
