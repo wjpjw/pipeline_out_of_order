@@ -40,12 +40,15 @@ void RAT_print_state(RAT *t){
 /////////////////////////////////////////////////////////////
 
 int  RAT_get_remap(RAT *t, int arf_id){
+  if(arf_id<0||arf_id>=MAX_ARF_REGS){
+    return -1;
+  }  
   RAT_Entry entry=t->RAT_Entries[arf_id];
   if(entry.valid){
     return entry.prf_id;
   }
   else{
-    return -1;
+    return -arf_id;
   }  
 }
 

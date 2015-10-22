@@ -29,12 +29,14 @@ ROB* ROB_init(void){
 void ROB_print_state(ROB *t){
  int ii = 0;
   printf("Printing ROB \n");
-  printf("Entry  Inst   Valid   ready\n");
-  for(ii = 0; ii < 7; ii++) {
+  printf(" Entry   Inst      Valid   ready   exec  src1_tag src2_tag\n");
+  for(ii = 0; ii < MAX_ROB_ENTRIES; ii++) {  //original:7 
     printf("%5d ::  %d\t", ii, (int)t->ROB_Entries[ii].inst.inst_num);
     printf(" %5d\t", t->ROB_Entries[ii].valid);
-    printf(" %5d\n", t->ROB_Entries[ii].ready);
-    printf(" %5d\n", t->ROB_Entries[ii].exec);
+    printf(" %5d\t", t->ROB_Entries[ii].ready);
+    printf(" %5d\t", t->ROB_Entries[ii].exec);
+    printf(" %5d\t", t->ROB_Entries[ii].inst.src1_tag);
+    printf(" %5d\n", t->ROB_Entries[ii].inst.src2_tag);
   }
   printf("\n");
 }
@@ -44,14 +46,17 @@ void ROB_print_state(ROB *t){
 /////////////////////////////////////////////////////////////
 int  ptr_next(int ptr){
   if(ptr<MAX_ROB_ENTRIES-1){
-    return ptr++;    
+    return ptr+1;    
   }
   else{
     return 0;
   }
 }  
 bool ROB_check_space(ROB *t){
-  return ptr_next(t->tail_ptr)!=t->head_ptr;
+  if(!t->ROB_Entries[t->head_ptr].valid){ //even head doesn't point to inst!
+    return true;
+  }  
+  return t->tail_ptr!=t->head_ptr;
 }
 
 /////////////////////////////////////////////////////////////
@@ -60,15 +65,17 @@ bool ROB_check_space(ROB *t){
 //return the prf_id assigned for the inst!
 int ROB_insert(ROB *t, Inst_Info inst){
   if(!ROB_check_space(t)){
+    //printf("rob.cpp: ROB no space!");
     return -1;
   }
-  t->tail_ptr=ptr_next(t->tail_ptr);
-  t->ROB_Entries[t->tail_ptr].valid=true;
-  t->ROB_Entries[t->tail_ptr].exec =false;
-  t->ROB_Entries[t->tail_ptr].ready=false;
-  t->ROB_Entries[t->tail_ptr].inst=inst;
-  inst.dr_tag=t->tail_ptr;
-  return t->tail_ptr;
+  int tmp=t->tail_ptr;
+  t->ROB_Entries[tmp].valid=true;
+  t->ROB_Entries[tmp].exec =false;
+  t->ROB_Entries[tmp].ready=false;
+  t->ROB_Entries[tmp].inst=inst;
+  t->ROB_Entries[tmp].inst.dr_tag=tmp;  // use its index in rob to represent dest tag!
+  t->tail_ptr=ptr_next(t->tail_ptr);                    // increment tail
+  return tmp;
 }
 
 /////////////////////////////////////////////////////////////
@@ -89,11 +96,11 @@ void ROB_mark_exec(ROB *t, Inst_Info inst){
 /////////////////////////////////////////////////////////////
 
 void ROB_mark_ready(ROB *t, Inst_Info inst){
-  for(int i=0;i<t->tail_ptr;i++){
+  for(int i=0;i<MAX_ROB_ENTRIES;i++){
     if(t->ROB_Entries[i].inst.inst_num==inst.inst_num){
       t->ROB_Entries[i].ready=true;
       t->ROB_Entries[i].inst=inst;  //update the inst!
-      break;
+      //break;
     }  
   }    
 }

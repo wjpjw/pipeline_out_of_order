@@ -156,11 +156,15 @@ void pipe_print_state(Pipeline *p){
 /**********************************************************************
  * Pipeline Main Function: Every cycle, cycle the stage
  **********************************************************************/
-
+#define WJP 47500
+ROB_Entry* oldest_entry(ROB*rob);
 void pipe_cycle(Pipeline *p)
 {
     p->stat_num_cycle++;
-
+    //static int i=0;
+    //i++;
+    //p->stat_num_cycle=i;
+    
     pipe_cycle_commit(p);
     pipe_cycle_writeback(p);
     pipe_cycle_exe(p);
@@ -168,7 +172,24 @@ void pipe_cycle(Pipeline *p)
     pipe_cycle_issue(p);
     pipe_cycle_decode(p);
     pipe_cycle_fetch(p);
+    /*/------------------test-----------------------
+    if(i>WJP-2){
+      printf("Cycle:%d\n",i);
+      if(ROB_check_head(p->pipe_ROB)){
+	printf("%d committed! halt:%d\n",p->pipe_ROB->head_ptr, p->halt_inst_num);
+      }
 
+      printf("inst->dr_tag:%d",oldest_entry(p->pipe_ROB)->inst.dr_tag);
+
+      printf("tail:%d, head: %d\n",p->pipe_ROB->tail_ptr, p->pipe_ROB->head_ptr);
+      ROB_print_state(p->pipe_ROB);
+      //RAT_print_state(p->pipe_RAT);
+      //EXEQ_print_state(p->pipe_EXEQ);
+    }
+    if(i==WJP){
+      exit(0);
+    }
+    //-------------------test-----------------------*/
 }
 
 //--------------------------------------------------------------------//
@@ -179,18 +200,16 @@ void pipe_cycle_fetch(Pipeline *p){
 
   for(ii=0; ii<PIPE_WIDTH; ii++) {
     if((p->FE_latch[ii].stall) || (p->FE_latch[ii].valid)) {   // Stall
-        continue;
-
+      continue;
     } else {  // No Stall and Latch Empty
         pipe_fetch_inst(p, &fetch_latch);
         // copy the op in FE LATCH
-        p->FE_latch[ii]=fetch_latch;
+        p->FE_latch[ii]=fetch_latch;	
     }
   }
 }
 
 //--------------------------------------------------------------------//
-
 void pipe_cycle_decode(Pipeline *p){
    int ii = 0;
 
@@ -217,6 +236,7 @@ void pipe_cycle_decode(Pipeline *p){
      }
    }
 }
+
 
 //--------------------------------------------------------------------//
 
@@ -270,48 +290,63 @@ void pipe_cycle_exe(Pipeline *p){
  * -----------  DO NOT MODIFY THE CODE ABOVE THIS LINE ----------------
  **********************************************************************/
 void rename(RAT*rat, Inst_Info*inst){
-  RAT_set_remap(rat, inst->dest_reg, inst->dr_tag);
   inst->src1_tag=RAT_get_remap(rat, inst->src1_reg);
   inst->src2_tag=RAT_get_remap(rat, inst->src2_reg);
-  if(inst->src1_tag==-1){
-    inst->src1_tag=inst->src1_reg;
-    inst->src1_ready=true;
+  if(inst->dest_reg!=-1){ //if dest_reg==-1, there is no need to remap!
+    RAT_set_remap(rat, inst->dest_reg, inst->dr_tag);
   }
-  if(inst->src2_tag==-1){
-    inst->src2_tag=inst->src2_reg;
-    inst->src2_ready=true;
-  }  
 }  
 void pipe_cycle_issue(Pipeline *p) {
   int jj = 0;
-  static uint64_t start_inst_id = 1;
+  static uint64_t start_inst_id2 = 1;
   // Loop Over ID Latch
   for(jj = 0; jj < PIPE_WIDTH; jj++) {
     if(!ROB_check_space(p->pipe_ROB)){
-      //rob has no space!
       return;
     }
     if(p->ID_latch[jj].valid) {
-      if(p->ID_latch[jj].inst.inst_num == start_inst_id) { // In Order Inst Found
-	ROB_insert(p->pipe_ROB,  p->ID_latch[jj].inst);    // insert inst into rob (valid = 1, exec = 0, ready = 0)
-	rename(p->pipe_RAT, &p->ID_latch[jj].inst);        // rename inst's src tags and write inst's dr_tag into rat!  
-	p->ID_latch[jj].valid  = false;                    // false means empty!
-	start_inst_id++;
+      if(p->ID_latch[jj].inst.inst_num == start_inst_id2) {               // In Order Inst Found
+        int index=ROB_insert(p->pipe_ROB,  p->ID_latch[jj].inst);         // insert inst into rob (valid = 1, exec = 0, ready = 0)
+	rename(p->pipe_RAT, &p->pipe_ROB->ROB_Entries[index].inst);       // rename inst's src tags and write inst's dr_tag into rat!  
+	p->ID_latch[jj].valid  = false;                                   // false means empty!
+	start_inst_id2++;
       }
     }
   }
 }
 
 //--------------------------------------------------------------------//
-bool inst_ready(Inst_Info inst){
-  return inst.src1_ready&&inst.src2_ready;
+bool inst_ready(Inst_Info* inst, ROB* rob){
+  inst->src1_ready=true;
+  inst->src2_ready=true;
+  for(int i=rob->head_ptr;i!=inst->dr_tag;i=ptr_next(i)){
+    if(!rob->ROB_Entries[i].valid)continue;
+    int tmp=rob->ROB_Entries[i].inst.dr_tag;
+    if(tmp==inst->src1_tag||tmp==inst->src2_tag){
+      if(inst->src1_tag==tmp){
+	inst->src1_ready=false;
+      }
+      if(inst->src2_tag==tmp){
+	inst->src2_ready=false;
+      }
+      return false;  // 
+    }
+  }
+  return true;
 }
 ROB_Entry* oldest_entry(ROB*rob){
-  return &rob->ROB_Entries[rob->head_ptr];
-}
-ROB_Entry* ooo_oldest_entry(ROB*rob){
   for(int i=rob->head_ptr;i!=rob->tail_ptr;i=ptr_next(i)){
-    if(inst_ready(rob->ROB_Entries[i].inst) && !rob->ROB_Entries[i].exec){
+    ROB_Entry*t=&rob->ROB_Entries[i];
+    if(!t->exec&&!t->ready&&t->valid){
+      return t;
+    }  
+  }
+  return 0;
+}
+ROB_Entry* ooo_oldest_entry(ROB*rob){ 
+  for(int i=rob->head_ptr;i!=rob->tail_ptr;i=ptr_next(i)){
+    ROB_Entry*t=&rob->ROB_Entries[i];
+    if(inst_ready(&t->inst,rob) && !t->exec && t->valid && !t->ready){
       rob->ROB_Entries[i].exec=true;
       return &rob->ROB_Entries[i];
     }  
@@ -322,13 +357,16 @@ void pipe_cycle_schedule(Pipeline *p) {
   if(SCHED_POLICY==0){
     int jj = 0;
     for(jj = 0; jj < PIPE_WIDTH; jj++) {
-      if(p->SC_latch[jj].valid || p->SC_latch[jj].stall) {
+      if(p->SC_latch[jj].valid || p->SC_latch[jj].stall) {  //will be always empty because ex stage does not stall!
 	continue;
       }
       ROB_Entry* e=oldest_entry(p->pipe_ROB);
-      if(inst_ready(e->inst) && !e->exec){
+      if(e==0)return;//In ROB there is no executable inst!
+      if(inst_ready(&e->inst, p->pipe_ROB)){
+	p->SC_latch[jj].valid=true;
+	p->SC_latch[jj].stall=false;
+	p->SC_latch[jj].inst=e->inst;
 	e->exec=true;
-	p->SC_latch[jj]={true,false,e->inst};
       }
     }
   }
@@ -340,7 +378,9 @@ void pipe_cycle_schedule(Pipeline *p) {
       }
       ROB_Entry* e=ooo_oldest_entry(p->pipe_ROB);
       if(e!=0){
-	p->SC_latch[jj]={true,false,e->inst};
+	p->SC_latch[jj].valid=true;
+	p->SC_latch[jj].stall=false;
+	p->SC_latch[jj].inst=e->inst;
       }
     }
   }
@@ -357,7 +397,8 @@ void pipe_cycle_writeback(Pipeline *p){
   for(jj = 0; jj < MAX_WRITEBACKS; jj++) {      
     if(p->EX_latch[jj].valid){
       ROB_wakeup(p->pipe_ROB, p->EX_latch[jj].inst.dr_tag);
-      ROB_mark_ready(p->pipe_ROB, p->EX_latch[jj].inst);  
+      ROB_mark_ready(p->pipe_ROB, p->EX_latch[jj].inst);      //mark ready!
+      p->EX_latch[jj].valid=false;                            //empty!
     }
   }
 }
@@ -367,25 +408,21 @@ void pipe_cycle_writeback(Pipeline *p){
 
 
 void pipe_cycle_commit(Pipeline *p) {
-  int ii = 0;
-  
   // TODO: check the head of the ROB. If ready commit (update stats)
   // TODO: Deallocate entry from ROB
   // TODO: Update RAT after checking if the mapping is still relevant
-  if(!ROB_check_head(p->pipe_ROB)) return;
+  if(!ROB_check_head(p->pipe_ROB)){ 
+    return; //do nothing!
+  }
+
+  if(p->halt_inst_num==p->pipe_ROB->ROB_Entries[p->pipe_ROB->head_ptr].inst.inst_num){
+    p->halt=true;
+  }
+  
   Inst_Info committed=ROB_remove_head(p->pipe_ROB);
   RAT_reset_entry(p->pipe_RAT, committed.dest_reg);
-  // DUMMY CODE (for compiling, and ensuring simulation terminates!)
-  for(ii=0; ii<PIPE_WIDTH; ii++){
-    if(p->FE_latch[ii].valid){
-      if(p->FE_latch[ii].inst.inst_num >= p->halt_inst_num){
-        p->halt=true;
-      }else{
-	p->stat_retired_inst++;
-	p->FE_latch[ii].valid=false;
-      }
-    }
-  }
+  p->stat_retired_inst++;
+  
 }
 
 //--------------------------------------------------------------------//
