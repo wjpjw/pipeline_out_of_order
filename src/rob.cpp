@@ -78,6 +78,22 @@ int ROB_insert(ROB *t, Inst_Info inst){
   return tmp;
 }
 
+
+//ROB size!
+int ROB_size(ROB*t){
+  if(t->ROB_Entries[t->head_ptr].valid==false){
+    return 0;
+  }  
+  if(t->head_ptr<t->tail_ptr){
+    return t->tail_ptr-t->head_ptr;
+  }
+  else{
+    return MAX_ROB_ENTRIES-(t->head_ptr-t->tail_ptr);
+  }
+  
+}  
+
+
 /////////////////////////////////////////////////////////////
 // When an inst gets scheduled for execution, mark exec
 /////////////////////////////////////////////////////////////

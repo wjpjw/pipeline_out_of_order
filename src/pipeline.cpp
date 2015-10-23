@@ -156,33 +156,21 @@ void pipe_print_state(Pipeline *p){
 /**********************************************************************
  * Pipeline Main Function: Every cycle, cycle the stage
  **********************************************************************/
-#define WJP 47500
+#define WJP 774
 ROB_Entry* oldest_entry(ROB*rob);
 void pipe_cycle(Pipeline *p)
 {
     p->stat_num_cycle++;
-    //static int i=0;
-    //i++;
-    //p->stat_num_cycle=i;
-    
-    pipe_cycle_commit(p);
-    pipe_cycle_writeback(p);
-    pipe_cycle_exe(p);
-    pipe_cycle_schedule(p);
-    pipe_cycle_issue(p);
-    pipe_cycle_decode(p);
-    pipe_cycle_fetch(p);
-    /*/------------------test-----------------------
-    if(i>WJP-2){
+    //------------------test-----------------------
+    static int i=0;
+    i++;
+    if(i>WJP-774){
       printf("Cycle:%d\n",i);
       if(ROB_check_head(p->pipe_ROB)){
 	printf("%d committed! halt:%d\n",p->pipe_ROB->head_ptr, p->halt_inst_num);
       }
 
-      printf("inst->dr_tag:%d",oldest_entry(p->pipe_ROB)->inst.dr_tag);
-
-      printf("tail:%d, head: %d\n",p->pipe_ROB->tail_ptr, p->pipe_ROB->head_ptr);
-      ROB_print_state(p->pipe_ROB);
+      printf("size:%d,  tail:%d, head: %d\n", ROB_size(p->pipe_ROB), p->pipe_ROB->tail_ptr, p->pipe_ROB->head_ptr);
       //RAT_print_state(p->pipe_RAT);
       //EXEQ_print_state(p->pipe_EXEQ);
     }
@@ -190,6 +178,19 @@ void pipe_cycle(Pipeline *p)
       exit(0);
     }
     //-------------------test-----------------------*/
+
+    pipe_cycle_commit(p);
+    pipe_cycle_writeback(p);
+    pipe_cycle_exe(p);
+    pipe_cycle_schedule(p);
+    pipe_cycle_issue(p);
+    pipe_cycle_decode(p);
+    pipe_cycle_fetch(p);
+    
+    if(i>WJP-10 || i<10){
+        ROB_print_state(p->pipe_ROB);
+    }
+    
 }
 
 //--------------------------------------------------------------------//
@@ -315,10 +316,14 @@ void pipe_cycle_issue(Pipeline *p) {
   }
 }
 
+
 //--------------------------------------------------------------------//
 bool inst_ready(Inst_Info* inst, ROB* rob){
   inst->src1_ready=true;
   inst->src2_ready=true;
+  if(inst->src1_tag==-1&&inst->src1_tag==-1){
+    return true;
+  }  
   for(int i=rob->head_ptr;i!=inst->dr_tag;i=ptr_next(i)){
     if(!rob->ROB_Entries[i].valid)continue;
     int tmp=rob->ROB_Entries[i].inst.dr_tag;
@@ -361,7 +366,7 @@ void pipe_cycle_schedule(Pipeline *p) {
 	continue;
       }
       ROB_Entry* e=oldest_entry(p->pipe_ROB);
-      if(e==0)return;//In ROB there is no executable inst!
+      if(e==0)return;        //In ROB there is no executable inst! So we do not schedule at all!
       if(inst_ready(&e->inst, p->pipe_ROB)){
 	p->SC_latch[jj].valid=true;
 	p->SC_latch[jj].stall=false;
@@ -394,9 +399,9 @@ void pipe_cycle_writeback(Pipeline *p){
   // TODO: Writeback to ROB (using wakeup function)
   // TODO: Update the ROB, mark ready, and update Inst Info in ROB
   int jj = 0;
-  for(jj = 0; jj < MAX_WRITEBACKS; jj++) {      
+  for(jj = 0; jj < MAX_WRITEBACKS; jj++){      
     if(p->EX_latch[jj].valid){
-      ROB_wakeup(p->pipe_ROB, p->EX_latch[jj].inst.dr_tag);
+      //ROB_wakeup(p->pipe_ROB, p->EX_latch[jj].inst.dr_tag);
       ROB_mark_ready(p->pipe_ROB, p->EX_latch[jj].inst);      //mark ready!
       p->EX_latch[jj].valid=false;                            //empty!
     }

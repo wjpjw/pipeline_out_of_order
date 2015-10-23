@@ -143,7 +143,6 @@ void print_stats(void) {
     printf("\n%s_NUM_INST           \t : %10u" , header, (uint32_t)stat_num_inst)  ;
     printf("\n%s_NUM_CYCLES         \t : %10u" , header, (uint32_t)stat_num_cycle);
     printf("\n%s_CPI                \t : %10.3f" , header, cpi);
-
     printf("\n\n");
 }
 
@@ -174,8 +173,8 @@ void check_heartbeat(void){
 
   // print a newline and CPI every so often
   if(pipeline->stat_num_cycle - last_hbeat_line >= 50*HEARTBEAT_CYCLES){
-    printf("\n(Inst:%8u\tCycle:%8u\tCPI:%6.3f)\t", (uint32_t)pipeline->stat_retired_inst,
-	   (uint32_t)pipeline->stat_num_cycle, (double)(pipeline->stat_num_cycle)/(double)(pipeline->stat_retired_inst+1));
+    printf("\n(Inst:%8u\tCycle:%8u\tCPI:%6.3f)\tROB_SIZE:%d\t", (uint32_t)pipeline->stat_retired_inst,
+	   (uint32_t)pipeline->stat_num_cycle, (double)(pipeline->stat_num_cycle)/(double)(pipeline->stat_retired_inst+1), ROB_size(pipeline->pipe_ROB));
     last_hbeat_line=pipeline->stat_num_cycle;
   }
 

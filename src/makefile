@@ -1,7 +1,7 @@
 SIM_SRC  = rat.cpp rob.cpp pipeline.cpp sim.cpp exeq.cpp 
 SIM_OBJS = $(SIM_SRC:.cpp=.o)
 
-all: $(SIM_SRC) sim
+all: clean $(SIM_SRC) sim
 
 %.o: %.cpp
 	g++ -Wall -c -o $@ $<  
