@@ -156,15 +156,18 @@ void pipe_print_state(Pipeline *p){
 /**********************************************************************
  * Pipeline Main Function: Every cycle, cycle the stage
  **********************************************************************/
-#define WJP 774
+//#define WJP 10000
 ROB_Entry* oldest_entry(ROB*rob);
 void pipe_cycle(Pipeline *p)
 {
-    p->stat_num_cycle++;
+  p->stat_num_cycle++;
     //------------------test-----------------------
+    
     static int i=0;
     i++;
-    if(i>WJP-774){
+    p->stat_num_cycle=i;
+    #ifdef WJP
+    if(i>WJP-1774){
       printf("Cycle:%d\n",i);
       if(ROB_check_head(p->pipe_ROB)){
 	printf("%d committed! halt:%d\n",p->pipe_ROB->head_ptr, p->halt_inst_num);
@@ -177,6 +180,7 @@ void pipe_cycle(Pipeline *p)
     if(i==WJP){
       exit(0);
     }
+    #endif
     //-------------------test-----------------------*/
 
     pipe_cycle_commit(p);
@@ -186,10 +190,12 @@ void pipe_cycle(Pipeline *p)
     pipe_cycle_issue(p);
     pipe_cycle_decode(p);
     pipe_cycle_fetch(p);
-    
-    if(i>WJP-10 || i<10){
+
+    #ifdef WJP
+    if(i>WJP-30){
         ROB_print_state(p->pipe_ROB);
     }
+    #endif
     
 }
 
@@ -339,8 +345,11 @@ bool inst_ready(Inst_Info* inst, ROB* rob){
   }
   return true;
 }
+
 ROB_Entry* oldest_entry(ROB*rob){
-  for(int i=rob->head_ptr;i!=rob->tail_ptr;i=ptr_next(i)){
+  bool ttt=true;
+  for(int i=rob->head_ptr;i!=rob->tail_ptr||ttt;i=ptr_next(i)){
+    ttt=false;
     ROB_Entry*t=&rob->ROB_Entries[i];
     if(!t->exec&&!t->ready&&t->valid){
       return t;

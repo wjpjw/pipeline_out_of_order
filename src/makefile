@@ -10,4 +10,4 @@ sim: $(SIM_OBJS)
 	g++ -Wall -o $@ $^
 
 clean: 
-	rm sim *.o
+	rm -rf sim *.o
