@@ -5,7 +5,7 @@
 #include "trace.h"
 #include <cstdlib>
 
-#define MAX_ROB_ENTRIES 8   // original:256 
+#define MAX_ROB_ENTRIES 256   // original:256 
 
 typedef struct ROB_Entry_Struct {
   bool     valid;
@@ -36,6 +36,7 @@ void      ROB_mark_exec(ROB *t, Inst_Info inst);
 void      ROB_mark_ready(ROB *t, Inst_Info inst);
 bool      ROB_check_ready(ROB *t, int tag);
 bool      ROB_check_head(ROB *t);
+
 void      ROB_wakeup(ROB *t, int tag);
 Inst_Info ROB_remove_head(ROB *t);
 

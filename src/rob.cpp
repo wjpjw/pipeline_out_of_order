@@ -29,14 +29,17 @@ ROB* ROB_init(void){
 void ROB_print_state(ROB *t){
  int ii = 0;
   printf("Printing ROB \n");
-  printf(" Entry   Inst      Valid   ready   exec  src1_tag src2_tag\n");
+  printf(" Entry   Inst      Valid   ready   exec  src1_tag src2_tag   p1      p2\n");
   for(ii = 0; ii < MAX_ROB_ENTRIES; ii++) {  //original:7 
     printf("%5d ::  %d\t", ii, (int)t->ROB_Entries[ii].inst.inst_num);
     printf(" %5d\t", t->ROB_Entries[ii].valid);
     printf(" %5d\t", t->ROB_Entries[ii].ready);
     printf(" %5d\t", t->ROB_Entries[ii].exec);
     printf(" %5d\t", t->ROB_Entries[ii].inst.src1_tag);
-    printf(" %5d\n", t->ROB_Entries[ii].inst.src2_tag);
+    printf(" %5d\t", t->ROB_Entries[ii].inst.src2_tag);
+    printf(" %5d\t", t->ROB_Entries[ii].inst.src1_ready);
+    printf(" %5d\n", t->ROB_Entries[ii].inst.src2_ready);
+
   }
   printf("\n");
 }
@@ -144,7 +147,9 @@ bool ROB_check_head(ROB *t){
 
 void  ROB_wakeup(ROB *t, int tag){
   int dr_tag=t->ROB_Entries[tag].inst.dr_tag;
-  for(int i=0;i<t->tail_ptr;i++){
+  bool ttt=true;
+  for(int i=t->head_ptr;i!=t->tail_ptr||ttt;i=ptr_next(i)){
+    ttt=false;
     if(t->ROB_Entries[i].inst.src1_tag==dr_tag){
       t->ROB_Entries[i].inst.src1_ready=true;
     }
